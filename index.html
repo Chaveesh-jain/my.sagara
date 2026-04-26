@@ -1,0 +1,285 @@
+import { useState } from "react";
+
+const LOGO = "/mnt/user-data/uploads/1000082500.png";
+const FOUNDER_IMG = "/mnt/user-data/uploads/1000027594.jpg";
+const COFOUNDER_IMG = "/mnt/user-data/uploads/1000081176.jpg";
+
+const CATEGORIES = [
+  { id: "electronics", icon: "📱", label: "Electronics" },
+  { id: "vehicles", icon: "🚗", label: "Vehicles" },
+  { id: "furniture", icon: "🛋️", label: "Furniture" },
+  { id: "clothes", icon: "👗", label: "Clothes" },
+  { id: "agriculture", icon: "🌾", label: "Agriculture" },
+  { id: "tools", icon: "🔧", label: "Tools" },
+  { id: "books", icon: "📚", label: "Books" },
+  { id: "property", icon: "🏠", label: "Property" },
+  { id: "sports", icon: "⚽", label: "Sports" },
+  { id: "other", icon: "📦", label: "Other" },
+];
+
+const WORKER_SKILLS = [
+  "Electrician","Plumber","Carpenter","Painter",
+  "Mason","Welder","Driver","Cook","Security Guard","Cleaner",
+  "Farmer","Farm Labourer","Irrigation Worker","Tractor Operator","Harvesting Worker",
+  "Crop Sprayer","Gardener","Dairy Worker","Poultry Worker","Organic Farmer",
+];
+
+export default function SmartBazaar() {
+  const [page, setPage] = useState("home");
+  const [authPage, setAuthPage] = useState(null);
+  const [user, setUser] = useState(null);
+  const [products, setProducts] = useState([]);
+  const [workers, setWorkers] = useState([]);
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [selectedWorker, setSelectedWorker] = useState(null);
+  const [activeTab, setActiveTab] = useState("buy");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [workerSearch, setWorkerSearch] = useState("");
+  const [workerFilter, setWorkerFilter] = useState("all"); // all | ready | busy
+  const [filterCat, setFilterCat] = useState("all");
+  const [sellForm, setSellForm] = useState({ name:"", desc:"", price:"", type:"sell", rentType:"monthly", category:"electronics", location:"", deposit:"", imgBase64:null });
+  const [workForm, setWorkForm] = useState({ name:"", skill:"Electrician", exp:"", location:"", phone:"", imgBase64:null, available:true });
+  const [signupForm, setSignupForm] = useState({ fullname:"", phone:"", whatsapp:"", password:"" });
+  const [signinForm, setSigninForm] = useState({ phone:"", password:"" });
+  const [toast, setToast] = useState(null);
+  const [myListings, setMyListings] = useState([]);
+  const [myWorkerProfile, setMyWorkerProfile] = useState(null);
+
+  const showToast = (msg, type="success") => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 3000);
+  };
+
+  const handleImageUpload = (e, setter, stateRef) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) { showToast("Please select an image file", "error"); return; }
+    if (file.size > 5 * 1024 * 1024) { showToast("Image must be under 5MB", "error"); return; }
+    const reader = new FileReader();
+    reader.onload = (ev) => setter(prev => ({ ...prev, imgBase64: ev.target.result }));
+    reader.onerror = () => showToast("Failed to read image", "error");
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
+
+  const handleSignup = () => {
+    if (!signupForm.fullname || !signupForm.phone || !signupForm.password) { showToast("Please fill all required fields","error"); return; }
+    const u = { name: signupForm.fullname, phone: signupForm.phone, whatsapp: signupForm.whatsapp || signupForm.phone };
+    setUser(u); setAuthPage(null);
+    showToast(`Welcome, ${u.name}! 🎉`);
+  };
+
+  const handleSignin = () => {
+    if (!signinForm.phone || !signinForm.password) { showToast("Please enter phone and password","error"); return; }
+    const u = { name: "Smart Bazaar User", phone: signinForm.phone, whatsapp: signinForm.phone };
+    setUser(u); setAuthPage(null);
+    showToast("Signed in successfully! 👋");
+  };
+
+  const handleSellSubmit = () => {
+    if (!user) { setAuthPage("signin"); return; }
+    if (!sellForm.name || !sellForm.price) { showToast("Fill product name and price","error"); return; }
+    const np = { id: Date.now(), name: sellForm.name, price: parseInt(sellForm.price), type: sellForm.type, category: sellForm.category, location: sellForm.location, img: sellForm.imgBase64||null, seller: user.name, phone: user.phone, description: sellForm.desc, rentType: sellForm.rentType, deposit: sellForm.deposit };
+    setProducts(p => [np,...p]);
+    setMyListings(l => [np,...l]);
+    setSellForm({ name:"", desc:"", price:"", type:"sell", rentType:"monthly", category:"electronics", location:"", deposit:"", imgBase64:null });
+    setPage("home"); setActiveTab("buy");
+    showToast("Product listed successfully! 🎉");
+  };
+
+  const handleWorkerRegister = () => {
+    if (!user) { setAuthPage("signin"); return; }
+    if (!workForm.name || !workForm.phone) { showToast("Fill name and phone","error"); return; }
+    const nw = { id: Date.now(), name: workForm.name, skill: workForm.skill, exp: workForm.exp, location: workForm.location, phone: workForm.phone, available: workForm.available, img: workForm.imgBase64||null, userId: user.phone };
+    setWorkers(w => [nw,...w]);
+    setMyWorkerProfile(nw);
+    setWorkForm({ name:"", skill:"Electrician", exp:"", location:"", phone:"", imgBase64:null, available:true });
+    setPage("home"); setActiveTab("hire");
+    showToast("Worker profile registered! 💼");
+  };
+
+  const toggleMyAvailability = () => {
+    if (!myWorkerProfile) return;
+    const updated = { ...myWorkerProfile, available: !myWorkerProfile.available };
+    setMyWorkerProfile(updated);
+    setWorkers(ws => ws.map(w => w.id === updated.id ? updated : w));
+    showToast(updated.available ? "You are now Ready to Work ✅" : "You are now marked as Busy ⏸");
+  };
+
+  const deleteProduct = (id) => {
+    setProducts(p => p.filter(x => x.id !== id));
+    setMyListings(l => l.filter(x => x.id !== id));
+    showToast("Listing deleted");
+  };
+
+  const filteredProducts = products.filter(p => {
+    const matchTab = activeTab === "buy" ? p.type === "sell" : p.type === "rent";
+    const matchSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchCat = filterCat === "all" || p.category === filterCat;
+    return matchTab && matchSearch && matchCat;
+  });
+
+  const filteredWorkers = workers.filter(w => {
+    const matchSearch = w.name.toLowerCase().includes(workerSearch.toLowerCase()) || w.skill.toLowerCase().includes(workerSearch.toLowerCase()) || (w.location||"").toLowerCase().includes(workerSearch.toLowerCase());
+    const matchFilter = workerFilter === "all" ? true : workerFilter === "ready" ? w.available : !w.available;
+    return matchSearch && matchFilter;
+  });
+
+  const whatsappProduct = (p) => {
+    const msg = encodeURIComponent(`Hello, I want to buy this product: ${p.name} (₹${p.price}). Listed on Smart Bazaar.`);
+    window.open(`https://wa.me/91${p.phone}?text=${msg}`,"_blank");
+  };
+  const whatsappWorker = (w) => {
+    const msg = encodeURIComponent(`Hello, I want to hire you for ${w.skill} work. Found on Smart Bazaar.`);
+    window.open(`https://wa.me/91${w.phone}?text=${msg}`,"_blank");
+  };
+
+  const Avatar = ({ src, name, size=60, border="#2ecc71" }) => (
+    src
+      ? <img src={src} style={{ width:size, height:size, borderRadius:"50%", objectFit:"cover", border:`3px solid ${border}`, flexShrink:0 }} />
+      : <div style={{ width:size, height:size, borderRadius:"50%", background:"linear-gradient(135deg,#2ecc71,#27ae60)", display:"flex", alignItems:"center", justifyContent:"center", color:"white", fontWeight:800, fontSize:size*0.38, border:`3px solid ${border}`, flexShrink:0 }}>
+          {name?.[0]?.toUpperCase()||"?"}
+        </div>
+  );
+
+  const ProductImg = ({ src, h=120 }) => (
+    src
+      ? <img src={src} style={{ width:"100%", height:h, objectFit:"cover" }} />
+      : <div style={{ width:"100%", height:h, background:"linear-gradient(135deg,#e8eaf0,#d0d3de)", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", color:"#aaa" }}>
+          <div style={{ fontSize:28 }}>📷</div>
+          <div style={{ fontSize:11, marginTop:4 }}>No Image</div>
+        </div>
+  );
+
+  return (
+    <div style={{ fontFamily:"'Nunito','Segoe UI',sans-serif", background:"#f5f7fa", minHeight:"100vh", maxWidth:480, margin:"0 auto", position:"relative", overflowX:"hidden" }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Poppins:wght@600;700;800&display=swap');
+        *{box-sizing:border-box;margin:0;padding:0;}
+        .btn{border:none;cursor:pointer;border-radius:12px;font-family:'Nunito',sans-serif;font-weight:800;transition:all 0.2s;}
+        .btn:active{transform:scale(0.96);}
+        .card{background:white;border-radius:16px;box-shadow:0 2px 16px rgba(0,0,0,0.08);overflow:hidden;transition:transform 0.15s;}
+        .card:active{transform:scale(0.98);}
+        input,textarea,select{font-family:'Nunito',sans-serif;border:2px solid #e8eaf0;border-radius:12px;padding:12px 14px;width:100%;font-size:15px;outline:none;transition:border 0.2s;}
+        input:focus,textarea:focus,select:focus{border-color:#2ecc71;}
+        .tab-btn{flex:1;padding:10px;border:none;border-radius:10px;font-family:'Nunito',sans-serif;font-weight:700;font-size:14px;cursor:pointer;transition:all 0.2s;}
+        .chip{display:inline-block;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:700;}
+        ::-webkit-scrollbar{height:4px;width:4px;}::-webkit-scrollbar-thumb{background:#ddd;border-radius:4px;}
+        .slide-in{animation:slideIn 0.3s ease;}
+        @keyframes slideIn{from{opacity:0;transform:translateY(20px);}to{opacity:1;transform:translateY(0);}}
+        input[type="file"]{display:none;}
+        .toggle{width:52px;height:28px;border-radius:14px;border:none;cursor:pointer;transition:all 0.3s;position:relative;flex-shrink:0;}
+        .toggle::after{content:'';position:absolute;top:3px;width:22px;height:22px;border-radius:50%;background:white;transition:all 0.3s;}
+      `}</style>
+
+      {/* TOAST */}
+      {toast && (
+        <div style={{ position:"fixed", top:20, left:"50%", transform:"translateX(-50%)", zIndex:9999, background:toast.type==="error"?"#e74c3c":"#2ecc71", color:"white", padding:"12px 24px", borderRadius:24, fontWeight:700, fontSize:14, boxShadow:"0 4px 20px rgba(0,0,0,0.2)", whiteSpace:"nowrap", maxWidth:300, textAlign:"center" }}>
+          {toast.msg}
+        </div>
+      )}
+
+      {/* AUTH MODALS */}
+      {authPage && (
+        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.6)", zIndex:1000, display:"flex", alignItems:"flex-end" }} onClick={() => setAuthPage(null)}>
+          <div style={{ background:"white", width:"100%", maxWidth:480, margin:"0 auto", borderRadius:"24px 24px 0 0", padding:28, maxHeight:"90vh", overflowY:"auto" }} onClick={e=>e.stopPropagation()} className="slide-in">
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:24 }}>
+              <div>
+                <div style={{ fontFamily:"Poppins", fontWeight:800, fontSize:22, color:"#1a1a2e" }}>{authPage==="signin"?"Welcome Back 👋":"Join Connect Sagara 🚀"}</div>
+                <div style={{ color:"#888", fontSize:13, marginTop:2 }}>Your Area, Your Bazaar</div>
+              </div>
+              <button className="btn" onClick={()=>setAuthPage(null)} style={{ background:"#f0f0f0", padding:"6px 12px", fontSize:18, borderRadius:10 }}>✕</button>
+            </div>
+            {authPage==="signup" ? (
+              <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+                <input placeholder="Full Name *" value={signupForm.fullname} onChange={e=>setSignupForm({...signupForm,fullname:e.target.value})} />
+                <input placeholder="Phone Number *" type="tel" value={signupForm.phone} onChange={e=>setSignupForm({...signupForm,phone:e.target.value})} />
+                <input placeholder="WhatsApp Number (optional)" type="tel" value={signupForm.whatsapp} onChange={e=>setSignupForm({...signupForm,whatsapp:e.target.value})} />
+                <input placeholder="Password *" type="password" value={signupForm.password} onChange={e=>setSignupForm({...signupForm,password:e.target.value})} />
+                <button className="btn" onClick={handleSignup} style={{ background:"linear-gradient(135deg,#2ecc71,#27ae60)", color:"white", padding:"16px", fontSize:17, marginTop:4 }}>🚀 SIGN UP</button>
+                <div style={{ textAlign:"center", color:"#888", fontSize:13 }}>Already have an account? <span style={{ color:"#2ecc71", fontWeight:700, cursor:"pointer" }} onClick={()=>setAuthPage("signin")}>Sign In</span></div>
+              </div>
+            ) : (
+              <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+                <input placeholder="Phone Number *" value={signinForm.phone} onChange={e=>setSigninForm({...signinForm,phone:e.target.value})} />
+                <input placeholder="Password *" type="password" value={signinForm.password} onChange={e=>setSigninForm({...signinForm,password:e.target.value})} />
+                <button className="btn" onClick={handleSignin} style={{ background:"linear-gradient(135deg,#e74c3c,#c0392b)", color:"white", padding:"16px", fontSize:17, marginTop:4 }}>🔐 SIGN IN</button>
+                <div style={{ textAlign:"center", color:"#888", fontSize:13 }}>New here? <span style={{ color:"#2ecc71", fontWeight:700, cursor:"pointer" }} onClick={()=>setAuthPage("signup")}>Create Account</span></div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* PRODUCT DETAIL MODAL */}
+      {selectedProduct && (
+        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.7)", zIndex:900, display:"flex", alignItems:"flex-end" }} onClick={()=>setSelectedProduct(null)}>
+          <div style={{ background:"white", width:"100%", maxWidth:480, margin:"0 auto", borderRadius:"24px 24px 0 0", maxHeight:"90vh", overflowY:"auto" }} onClick={e=>e.stopPropagation()} className="slide-in">
+            <ProductImg src={selectedProduct.img} h={220} />
+            <div style={{ padding:20 }}>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"start" }}>
+                <div style={{ fontFamily:"Poppins", fontWeight:800, fontSize:20, color:"#1a1a2e", flex:1 }}>{selectedProduct.name}</div>
+                <span className="chip" style={{ background:selectedProduct.type==="sell"?"#e8f8ef":"#e8f0ff", color:selectedProduct.type==="sell"?"#2ecc71":"#3498db", marginLeft:8 }}>{selectedProduct.type==="sell"?"For Sale":"For Rent"}</span>
+              </div>
+              <div style={{ fontFamily:"Poppins", fontWeight:800, fontSize:28, color:selectedProduct.type==="sell"?"#e74c3c":"#3498db", marginTop:8 }}>
+                ₹{selectedProduct.price.toLocaleString()}{selectedProduct.type==="rent"?`/${selectedProduct.rentType==="monthly"?"mo":"day"}`:""}
+              </div>
+              {selectedProduct.deposit && <div style={{ color:"#888", fontSize:13, marginTop:2 }}>Deposit: ₹{selectedProduct.deposit}</div>}
+              {selectedProduct.description && <div style={{ color:"#555", fontSize:14, marginTop:12, lineHeight:1.6 }}>{selectedProduct.description}</div>}
+              <div style={{ display:"flex", gap:8, marginTop:12, flexWrap:"wrap", alignItems:"center" }}>
+                {selectedProduct.location && <><span style={{ fontSize:13 }}>📍</span><span style={{ color:"#888", fontSize:13 }}>{selectedProduct.location}</span><span style={{ color:"#ccc" }}>·</span></>}
+                <span style={{ color:"#888", fontSize:13 }}>👤 {selectedProduct.seller}</span>
+              </div>
+              <div style={{ marginTop:16, display:"flex", gap:12 }}>
+                <button className="btn" onClick={()=>whatsappProduct(selectedProduct)} style={{ flex:1, background:"linear-gradient(135deg,#25D366,#128C7E)", color:"white", padding:"14px", fontSize:15 }}>💬 WhatsApp</button>
+                <button className="btn" onClick={()=>setSelectedProduct(null)} style={{ background:"#f0f0f0", color:"#333", padding:"14px 20px" }}>✕</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* WORKER DETAIL MODAL */}
+      {selectedWorker && (
+        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.7)", zIndex:900, display:"flex", alignItems:"flex-end" }} onClick={()=>setSelectedWorker(null)}>
+          <div style={{ background:"white", width:"100%", maxWidth:480, margin:"0 auto", borderRadius:"24px 24px 0 0", padding:28 }} onClick={e=>e.stopPropagation()} className="slide-in">
+            <div style={{ display:"flex", gap:16, alignItems:"center" }}>
+              <Avatar src={selectedWorker.img} name={selectedWorker.name} size={80} border={selectedWorker.available?"#2ecc71":"#e74c3c"} />
+              <div>
+                <div style={{ fontFamily:"Poppins", fontWeight:800, fontSize:20, color:"#1a1a2e" }}>{selectedWorker.name}</div>
+                <div style={{ color:"#3498db", fontWeight:700, fontSize:15 }}>{selectedWorker.skill}</div>
+                <span className="chip" style={{ background:selectedWorker.available?"#e8f8ef":"#ffeaea", color:selectedWorker.available?"#2ecc71":"#e74c3c", marginTop:6, display:"inline-block" }}>
+                  {selectedWorker.available?"✅ Ready to Work":"⏸ Not Available"}
+                </span>
+              </div>
+            </div>
+            <div style={{ marginTop:20, display:"flex", flexDirection:"column", gap:10 }}>
+              {selectedWorker.exp && <div style={{ display:"flex", gap:8 }}><span>⏱</span><span style={{ color:"#555", fontSize:14 }}>Experience: <strong>{selectedWorker.exp}</strong></span></div>}
+              {selectedWorker.location && <div style={{ display:"flex", gap:8 }}><span>📍</span><span style={{ color:"#555", fontSize:14 }}>Location: <strong>{selectedWorker.location}</strong></span></div>}
+              <div style={{ display:"flex", gap:8 }}><span>📞</span><span style={{ color:"#555", fontSize:14 }}>Contact: <strong>{selectedWorker.phone}</strong></span></div>
+            </div>
+            <div style={{ marginTop:20, display:"flex", gap:12 }}>
+              {selectedWorker.available
+                ? <button className="btn" onClick={()=>whatsappWorker(selectedWorker)} style={{ flex:1, background:"linear-gradient(135deg,#25D366,#128C7E)", color:"white", padding:"14px", fontSize:15 }}>💬 Hire via WhatsApp</button>
+                : <div style={{ flex:1, background:"#ffeaea", borderRadius:12, padding:"14px", textAlign:"center", color:"#e74c3c", fontWeight:700, fontSize:14 }}>⏸ Currently Not Available</div>
+              }
+              <button className="btn" onClick={()=>setSelectedWorker(null)} style={{ background:"#f0f0f0", color:"#333", padding:"14px 20px" }}>✕</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* HEADER */}
+      <div style={{ background:"linear-gradient(135deg,#1a1a2e 0%,#16213e 100%)", padding:"12px 16px", position:"sticky", top:0, zIndex:100, boxShadow:"0 2px 20px rgba(0,0,0,0.3)" }}>
+        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+          <div style={{ display:"flex", alignItems:"center", gap:10, cursor:"pointer" }} onClick={()=>setPage("home")}>
+            <img src={LOGO} style={{ width:38, height:38, borderRadius:10, objectFit:"contain", background:"white", padding:2 }} />
+            <div>
+              <div style={{ fontFamily:"Poppins", fontWeight:800, fontSize:16, color:"white", lineHeight:1 }}>Connect Sagara</div>
+              <div style={{ fontSize:10, color:"#2ecc71", fontWeight:600 }}>📍 Sagara</div>
+            </div>
+          </div>
+          {user ? (
+            <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+              {myWorkerProfile && (
+                <div style={{ display:"flex", alignItems:"center", gap:6, background:"rgba(255,255,255,0.1)", borderRadius:20,
